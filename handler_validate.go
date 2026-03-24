@@ -28,20 +28,23 @@ func handlerValidateChirp(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	c.Body = cleanProfanity(c.Body)
+	badWords := map[string]struct{}{
+		"kerfuffle": {},
+		"sharbert":  {},
+		"fornax":    {},
+	}
+	cleaned := getCleanedBody(c.Body, badWords)
+
 	respondWithJSON(w, http.StatusOK, returnVals{
-		CleanedBody: c.Body,
+		CleanedBody: cleaned,
 	})
 }
 
-func cleanProfanity(s string) string {
-	badWords := []string{"kerfuffle", "sharbert", "fornax"}
+func getCleanedBody(s string, badWords map[string]struct{}) string {
 	words := strings.Split(s, " ")
 	for i := range words {
-		for _, badWord := range badWords {
-			if strings.ToLower(words[i]) == badWord {
-				words[i] = "****"
-			}
+		if _, ok := badWords[strings.ToLower(words[i])]; ok {
+			words[i] = "****"
 		}
 	}
 	return strings.Join(words, " ")
