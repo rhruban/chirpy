@@ -14,9 +14,29 @@ import (
 type Chrip struct {
 	ID        uuid.UUID `json:"id"`
 	CreatedAt time.Time `json:"created_at"`
-	UpdateAt  time.Time `json:"updated_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 	Body      string    `json:"body"`
 	UserID    uuid.UUID `json:"user_id"`
+}
+
+func (cfg *apiConfig) handlerChirpsGetAll(w http.ResponseWriter, req *http.Request) {
+	allChirps, err := cfg.db.GetChirps(req.Context())
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Could not retrieve chirps", err)
+		return
+	}
+
+	returnVal := []Chrip{}
+	for _, entry := range allChirps {
+		returnVal = append(returnVal, Chrip{
+			ID:        entry.ID,
+			CreatedAt: entry.CreatedAt,
+			UpdatedAt: entry.UpdatedAt,
+			Body:      entry.Body,
+			UserID:    entry.UserID,
+		})
+	}
+	respondWithJSON(w, http.StatusOK, returnVal)
 }
 
 func (cfg *apiConfig) handlerChirpsCreate(w http.ResponseWriter, req *http.Request) {
@@ -51,7 +71,7 @@ func (cfg *apiConfig) handlerChirpsCreate(w http.ResponseWriter, req *http.Reque
 	respondWithJSON(w, http.StatusCreated, Chrip{
 		ID:        c_db.ID,
 		CreatedAt: c_db.CreatedAt,
-		UpdateAt:  c_db.UpdatedAt,
+		UpdatedAt: c_db.UpdatedAt,
 		Body:      c_db.Body,
 		UserID:    c_db.UserID,
 	})
