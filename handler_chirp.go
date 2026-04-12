@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -10,39 +11,33 @@ import (
 	"github.com/rhruban/chirpy/internal/database"
 )
 
-func (cfg *apiConfig) handlerChirps(w http.ResponseWriter, req *http.Request) {
-	type chirp struct {
+type Chrip struct {
+	ID        uuid.UUID `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdateAt  time.Time `json:"updated_at"`
+	Body      string    `json:"body"`
+	UserID    uuid.UUID `json:"user_id"`
+}
+
+func (cfg *apiConfig) handlerChirpsCreate(w http.ResponseWriter, req *http.Request) {
+	type parameters struct {
 		Body   string    `json:"body"`
 		UserId uuid.UUID `json:"user_id"`
 	}
-	type returnVals struct {
-		ID        uuid.UUID `json:"id"`
-		CreatedAt time.Time `json:"created_at"`
-		UpdateAt  time.Time `json:"updated_at"`
-		Body      string    `json:"body"`
-		UserID    uuid.UUID `json:"user_id"`
-	}
 
 	decoder := json.NewDecoder(req.Body)
-	c := chirp{}
+	c := parameters{}
 	err := decoder.Decode(&c)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Could not decode body", err)
 		return
 	}
 
-	const maxChirpLength = 140
-	if len(c.Body) > maxChirpLength {
-		respondWithError(w, http.StatusBadRequest, "Chirp is too long", nil)
+	cleaned, err := validateChrip(c.Body)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error(), err)
 		return
 	}
-
-	badWords := map[string]struct{}{
-		"kerfuffle": {},
-		"sharbert":  {},
-		"fornax":    {},
-	}
-	cleaned := getCleanedBody(c.Body, badWords)
 
 	c_db, err := cfg.db.CreateChirp(req.Context(), database.CreateChirpParams{
 		Body:   cleaned,
@@ -53,13 +48,28 @@ func (cfg *apiConfig) handlerChirps(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	respondWithJSON(w, http.StatusCreated, returnVals{
+	respondWithJSON(w, http.StatusCreated, Chrip{
 		ID:        c_db.ID,
 		CreatedAt: c_db.CreatedAt,
 		UpdateAt:  c_db.UpdatedAt,
 		Body:      c_db.Body,
 		UserID:    c_db.UserID,
 	})
+}
+
+func validateChrip(body string) (string, error) {
+	const maxChirpLength = 140
+	if len(body) > maxChirpLength {
+		return "", errors.New("Chirp is too long")
+	}
+
+	badWords := map[string]struct{}{
+		"kerfuffle": {},
+		"sharbert":  {},
+		"fornax":    {},
+	}
+	cleaned := getCleanedBody(body, badWords)
+	return cleaned, nil
 }
 
 func getCleanedBody(s string, badWords map[string]struct{}) string {
