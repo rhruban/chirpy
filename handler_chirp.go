@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/rhruban/chirpy/internal/auth"
 	"github.com/rhruban/chirpy/internal/database"
 )
 
@@ -75,6 +76,16 @@ func (cfg *apiConfig) handlerChirpsCreate(w http.ResponseWriter, req *http.Reque
 		return
 	}
 
+	token, err := auth.GetBearerToken(req.Header)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Token error", err)
+	}
+
+	validUser, err := auth.ValidateJWT(token, cfg.secret)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Invalid Token", err)
+	}
+
 	cleaned, err := validateChrip(c.Body)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, err.Error(), err)
@@ -83,7 +94,7 @@ func (cfg *apiConfig) handlerChirpsCreate(w http.ResponseWriter, req *http.Reque
 
 	c_db, err := cfg.db.CreateChirp(req.Context(), database.CreateChirpParams{
 		Body:   cleaned,
-		UserID: c.UserId,
+		UserID: validUser,
 	})
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Could not create chirp", err)
