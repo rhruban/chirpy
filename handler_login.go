@@ -17,11 +17,9 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 
 	type response struct {
 		User
+		Token        string `json:"token"`
+		RefreshToken string `json:"refresh_token"`
 	}
-
-	const (
-		MAX_EXPIRE = 60 * 60
-	)
 
 	decoder := json.NewDecoder(r.Body)
 	params := parameters{}
@@ -43,14 +41,15 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	expiry := params.ExpiresInSeconds
-	if params.ExpiresInSeconds <= 0 || params.ExpiresInSeconds > MAX_EXPIRE {
-		expiry = MAX_EXPIRE
+	expiry := time.Hour
+	if params.ExpiresInSeconds > 0 && params.ExpiresInSeconds < 3600 {
+		expiry = time.Duration(params.ExpiresInSeconds) * time.Second
 	}
 
-	token, err := auth.MakeJWT(user.ID, cfg.secret, time.Duration(expiry)*time.Second)
+	accessToken, err := auth.MakeJWT(user.ID, cfg.jwtSecret, expiry)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Could not make token", err)
+		respondWithError(w, http.StatusInternalServerError, "Could not make jwt access token", err)
+		return
 	}
 
 	respondWithJSON(w, http.StatusOK, response{
@@ -59,7 +58,7 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 			Email:     user.Email,
 			CreatedAt: user.CreatedAt,
 			UpdatedAt: user.UpdatedAt,
-			Token:     token,
 		},
+		Token: accessToken,
 	})
 }

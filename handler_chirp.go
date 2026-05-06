@@ -64,26 +64,27 @@ func (cfg *apiConfig) handlerChirpsGetSingle(w http.ResponseWriter, req *http.Re
 
 func (cfg *apiConfig) handlerChirpsCreate(w http.ResponseWriter, req *http.Request) {
 	type parameters struct {
-		Body   string    `json:"body"`
-		UserId uuid.UUID `json:"user_id"`
-	}
-
-	decoder := json.NewDecoder(req.Body)
-	c := parameters{}
-	err := decoder.Decode(&c)
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Could not decode body", err)
-		return
+		Body string `json:"body"`
 	}
 
 	token, err := auth.GetBearerToken(req.Header)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Token error", err)
+		respondWithError(w, http.StatusUnauthorized, "Couldn't find JWT", err)
+		return
 	}
 
-	validUser, err := auth.ValidateJWT(token, cfg.secret)
+	validUser, err := auth.ValidateJWT(token, cfg.jwtSecret)
 	if err != nil {
-		respondWithError(w, http.StatusUnauthorized, "Invalid Token", err)
+		respondWithError(w, http.StatusUnauthorized, "Could not validate JWT", err)
+		return
+	}
+
+	decoder := json.NewDecoder(req.Body)
+	c := parameters{}
+	err = decoder.Decode(&c)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Could not decode body", err)
+		return
 	}
 
 	cleaned, err := validateChrip(c.Body)
