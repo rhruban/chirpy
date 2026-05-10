@@ -44,13 +44,36 @@ func (q *Queries) CreateRefreshToken(ctx context.Context, arg CreateRefreshToken
 	return i, err
 }
 
-const getRefreshByRefresh = `-- name: GetRefreshByRefresh :one
-SELECT token, created_at, updated_at, user_id, expires_at, revoked_at FROM refresh_tokens
-WHERE token = $1
+const getUserFromRefresh = `-- name: GetUserFromRefresh :one
+SELECT users.id, users.created_at, users.updated_at, users.email, users.hashed_password FROM users
+JOIN refresh_tokens on users.id = refresh_tokens.user_id
+WHERE refresh_tokens.token = $1
+AND revoked_at IS NULL
+AND expires_at > NOW()
 `
 
-func (q *Queries) GetRefreshByRefresh(ctx context.Context, token string) (RefreshToken, error) {
-	row := q.db.QueryRowContext(ctx, getRefreshByRefresh, token)
+func (q *Queries) GetUserFromRefresh(ctx context.Context, token string) (User, error) {
+	row := q.db.QueryRowContext(ctx, getUserFromRefresh, token)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Email,
+		&i.HashedPassword,
+	)
+	return i, err
+}
+
+const revokeRefresh = `-- name: RevokeRefresh :one
+UPDATE refresh_tokens SET updated_at = NOW(),
+revoked_at = NOW()
+WHERE token = $1
+RETURNING token, created_at, updated_at, user_id, expires_at, revoked_at
+`
+
+func (q *Queries) RevokeRefresh(ctx context.Context, token string) (RefreshToken, error) {
+	row := q.db.QueryRowContext(ctx, revokeRefresh, token)
 	var i RefreshToken
 	err := row.Scan(
 		&i.Token,
@@ -61,13 +84,4 @@ func (q *Queries) GetRefreshByRefresh(ctx context.Context, token string) (Refres
 		&i.RevokedAt,
 	)
 	return i, err
-}
-
-const revokeRefresh = `-- name: RevokeRefresh :exec
-UPDATE refresh_tokens SET updated_at = NOW(), revoked_at = NOW() where token = $1
-`
-
-func (q *Queries) RevokeRefresh(ctx context.Context, token string) error {
-	_, err := q.db.ExecContext(ctx, revokeRefresh, token)
-	return err
 }
