@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
+	"github.com/rhruban/chirpy/internal/auth"
 )
 
 func (cfg *apiConfig) handlerChirpyRedPayment(w http.ResponseWriter, req *http.Request) {
@@ -17,9 +18,17 @@ func (cfg *apiConfig) handlerChirpyRedPayment(w http.ResponseWriter, req *http.R
 		} `json:"data"`
 	}
 
+	apiKey, err := auth.GetAPIKey(req.Header)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Could not get apiKey", err)
+		return
+	}
+	if apiKey != cfg.polkaKey {
+		respondWithError(w, http.StatusUnauthorized, "Invalid apiKey", err)
+	}
 	decoder := json.NewDecoder(req.Body)
 	params := parameters{}
-	err := decoder.Decode(&params)
+	err = decoder.Decode(&params)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Could not decode in coming body", err)
 		return
