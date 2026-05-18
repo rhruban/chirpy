@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -22,6 +23,7 @@ type Chrip struct {
 
 func (cfg *apiConfig) handlerChirpsGetAll(w http.ResponseWriter, req *http.Request) {
 	s := req.URL.Query().Get("author_id")
+	order := req.URL.Query().Get("sort")
 	var allChirps []database.Chirp
 	var err error
 	if s != "" {
@@ -37,6 +39,10 @@ func (cfg *apiConfig) handlerChirpsGetAll(w http.ResponseWriter, req *http.Reque
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Could not retrieve chirps", err)
 		return
+	}
+
+	if order == "desc" {
+		sort.Slice(allChirps, func(i, j int) bool { return allChirps[i].CreatedAt.After(allChirps[j].CreatedAt) })
 	}
 
 	returnVal := []Chrip{}
