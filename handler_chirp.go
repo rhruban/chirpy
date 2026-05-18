@@ -21,7 +21,19 @@ type Chrip struct {
 }
 
 func (cfg *apiConfig) handlerChirpsGetAll(w http.ResponseWriter, req *http.Request) {
-	allChirps, err := cfg.db.GetChirps(req.Context())
+	s := req.URL.Query().Get("author_id")
+	var allChirps []database.Chirp
+	var err error
+	if s != "" {
+		u, err := uuid.Parse(s)
+		if err != nil {
+			respondWithError(w, http.StatusBadRequest, "could not parse user id", err)
+			return
+		}
+		allChirps, err = cfg.db.GetChirpsByUser(req.Context(), u)
+	} else {
+		allChirps, err = cfg.db.GetChirps(req.Context())
+	}
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Could not retrieve chirps", err)
 		return
